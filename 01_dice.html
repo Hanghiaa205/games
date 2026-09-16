@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>간이 스파이더 카드 게임</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #076324;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 { margin-bottom: 10px; }
+        #game-info {
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        #board {
+            display: flex;
+            gap: 15px;
+            min-height: 400px;
+            align-items: flex-start;
+        }
+        .column {
+            width: 80px;
+            min-height: 300px;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 6px;
+            padding: 5px;
+            position: relative;
+        }
+        .card {
+            width: 70px;
+            height: 100px;
+            background: white;
+            color: black;
+            border-radius: 4px;
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 5px;
+            box-sizing: border-box;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            cursor: pointer;
+            user-select: none;
+        }
+        .card.back {
+            background: #b22222;
+            color: #b22222;
+        }
+        .red { color: #d32f2f; }
+        .black { color: #212121; }
+        #controls {
+            margin-top: 30px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            background-color: #ffcc00;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: #e6b800; }
+    </style>
+</head>
+<body>
+
+    <h1>Spider Solitaire</h1>
+    <div id="game-info">완성한 세트: <span id="completed-sets">0</span> / 8</div>
+    
+    <div id="board"></div>
+
+    <div id="controls">
+        <button onclick="dealCards()">카드 더 나누기 (덱 남음)</button>
+    </div>
+
+    <script>
+        // 간단한 시뮬레이션을 위한 데이터 구조
+        const suits = ['♠', '♥', '♦', '♣'];
+        const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        let columns = Array.from({ length: 10 }, () => []);
+        let completedSets = 0;
+
+        function initGame() {
+            columns = Array.from({ length: 10 }, () => []);
+            completedSets = 0;
+            
+            // 임시로 화면에 카드미리보기 배치 구조 생성
+            let valIdx = 0;
+            for (let i = 0; i < 10; i++) {
+                // 각 열에 카드 5장씩 샘플 배치
+                for (let j = 0; j < 5; j++) {
+                    columns[i].push({
+                        suit: suits[(i + j) % 4],
+                        value: values[(valIdx++) % 13],
+                        faceUp: j === 4 // 맨 아래 카드만 앞면
+                    });
+                }
+            }
+            render();
+        }
+
+        function render() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            
+            columns.forEach((col, colIndex) => {
+                const colDiv = document.createElement('div');
+                colDiv.className = 'column';
+                
+                col.forEach((card, cardIndex) => {
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = `card ${card.faceUp ? (card.suit === '♥' || card.suit === '♦' ? 'red' : 'black') : 'back'}`;
+                    cardDiv.style.top = `${cardIndex * 25}px`;
+                    
+                    if (card.faceUp) {
+                        cardDiv.innerHTML = `<div>${card.value}${card.suit}</div><div style="align-self: flex-end;">${card.value}${card.suit}</div>`;
+                    }
+                    
+                    colDiv.appendChild(cardDiv);
+                });
+                
+                board.appendChild(colDiv);
+            });
+
+            document.getElementById('completed-sets').innerText = completedSets;
+        }
+
+        function dealCards() {
+            alert("스파이더 덱에서 카드를 각 열에 한 장씩 나누어 줍니다! (기능 확장 예정)");
+            // 여기에 카드 분배 로직 추가 가능
+        }
+
+        // 게임 시작 실행
+        initGame();
+    </script>
+</body>
+</html>
