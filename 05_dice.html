@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D 자동차 레이싱 게임</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #111;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+        h1 { margin: 5px 0; font-size: 1.5rem; }
+        #score-board {
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        #game-container {
+            position: relative;
+            width: 360px;
+            height: 540px;
+            background-color: #333;
+            border: 4px solid #555;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        /* 도로 배경선 (움직이는 효과) */
+        .road-line {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 60px;
+            background-color: #fff;
+        }
+        /* 자동차 공통 스타일 */
+        .car {
+            position: absolute;
+            width: 45px;
+            height: 80px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        /* 플레이어 자동차 */
+        #player {
+            background-color: #ff3b30;
+            bottom: 20px;
+            left: 157px; /* 중앙 근처 */
+        }
+        /* 적 자동차 */
+        .enemy {
+            background-color: #007aff;
+            top: -90px;
+        }
+        /* 시작/오버 화면 오버레이 */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            background-color: #ffcc00;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: #222;
+        }
+        button:hover { background-color: #e6b800; }
+    </style>
+</head>
+<body>
+
+    <h1>Car Racing</h1>
+    <div id="score-board">점수: <span id="score">0</span></div>
+
+    <div id="game-container">
+        <!-- 도로 중앙 차선들 (자바스크립트에서 움직임 처리) -->
+        <div class="road-line" style="top: -60px;"></div>
+        <div class="road-line" style="top: 120px;"></div>
+        <div class="road-line" style="top: 300px;"></div>
+        <div class="road-line" style="top: 480px;"></div>
+
+        <!-- 플레이어 자동차 -->
+        <div id="player" class="car"></div>
+
+        <!-- 시작 화면 오버레이 -->
+        <div id="start-screen">
+            <h2 id="game-message">레이싱 게임에 오신 것을 환영합니다!</h2>
+            <p style="font-size: 0.9rem; color: #ccc;">좌/우 방향키(또는 A, D)를 이용해 차를 피하세요.</p>
+            <button onclick="startGame()">게임 시작</button>
+        </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const scoreEl = document.getElementById('score');
+        const startScreen = document.getElementById('start-screen');
+        const gameMessage = document.getElementById('game-message');
+        const roadLines = document.querySelectorAll('.road-line');
+
+        let score = 0;
+        let gameSpeed = 4;
+        let isPlaying = false;
+        let playerX = 157; // 플레이어 X 좌표
+        let enemies = [];
+        let keys = { ArrowLeft: false, ArrowRight: false, KeyA: false, KeyD: false };
+        let gameInterval = null;
+        let enemyTimer = null;
+
+        // 도로 차선 움직이기 애니메이션용 변수
+        let roadOffset = 0;
+
+        function startGame() {
+            // 초기화
+            enemies.forEach(e => e.element.remove());
+            enemies = [];
+            score = 0;
+            gameSpeed = 5;
+            playerX = 157;
+            player.style.left = playerX + 'px';
+            scoreEl.innerText = score;
+            startScreen.style.display = 'none';
+            isPlaying = true;
+
+            // 게임 루프 시작
+            gameInterval = requestAnimationFrame(updateGame);
+            
+            // 적 차량 생성 타이머 (1.2초마다)
+            enemyTimer = setInterval(spawnEnemy, 1200);
+        }
+
+        function spawnEnemy() {
+            if (!isPlaying) return;
+
+            // 도로 폭(약 40px ~ 275px 사이) 내에서 무작위 X 위치 선정
+            // 총 3개 차선 중 하나 선택 (대략 왼쪽, 중앙, 오른쪽)
+            const lanes = [45, 157, 270];
+            let randomLaneX = lanes[Math.floor(Math.random() * lanes.length)];
+
+            let enemyEl = document.createElement('div');
+            enemyEl.className = 'car enemy';
+            enemyEl.style.left = randomLaneX + 'px';
+            enemyEl.style.top = '-90px';
+            
+            // 적 자동차 색상도 무작위로 변경
+            const colors = ['#007aff', '#34c759', '#af52de', '#ff9500'];
+            enemyEl.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+
+            container.appendChild(enemyEl);
+            enemies.push({
+                element: enemyEl,
+                x: randomLaneX,
+                y: -90
+            });
+        }
+
+        function updateGame() {
+            if (!isPlaying) return;
+
+            // 1. 플레이어 이동 처리 (좌우 방향키)
+            if ((keys.ArrowLeft || keys.KeyA) && playerX > 25) {
+                playerX -= 6;
+            }
+            if ((keys.ArrowRight || keys.KeyD) && playerX < 290) {
+                playerX += 6;
+            }
+            player.style.left = playerX + 'px';
+
+            // 2. 도로 차선 스크롤 효과
+            roadOffset += gameSpeed;
+            if (roadOffset >= 180) roadOffset = 0;
+            roadLines.forEach((line, index) => {
+                let currentTop = (index * 180 + roadOffset) - 60;
+                line.style.top = currentTop + 'px';
+            });
+
+            // 3. 적 차량 이동 및 충돌 체크
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let en = enemies[i];
+                en.y += gameSpeed;
+                en.element.style.top = en.y + 'px';
+
+                // 플레이어와 적 차량의 충돌 판정 (AABB 박스 충돌)
+                // 플레이어 위치: bottom 20px, 높이 80px, 너비 45px
+                let playerRect = { x: playerX, y: 540 - 20 - 80, width: 45, height: 80 };
+                let enemyRect = { x: en.x, y: en.y, width: 45, height: 80 };
+
+                if (
+                    playerRect.x < enemyRect.x + enemyRect.width &&
+                    playerRect.x + playerRect.width > enemyRect.x &&
+                    playerRect.y < enemyRect.y + enemyRect.height &&
+                    playerRect.y + playerRect.height > enemyRect.y
+                ) {
+                    gameOver();
+                    return;
+                }
+
+                // 화면 아래로 지나간 적 차량 처리 (점수 증가)
+                if (en.y > 540) {
+                    en.element.remove();
+                    enemies.splice(i, 1);
+                    score += 10;
+                    scoreEl.innerText = score;
+
+                    // 점수가 올라갈수록 속도 서서히 증가 (최대 12까지)
+                    if (score % 50 === 0 && gameSpeed < 12) {
+                        gameSpeed += 0.7;
+                    }
+                }
+            }
+
+            gameInterval = requestAnimationFrame(updateGame);
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            cancelAnimationFrame(gameInterval);
+            clearInterval(enemyTimer);
+
+            gameMessage.innerText = `게임 오버! 최종 점수: ${score}`;
+            startScreen.style.display = 'flex';
+            startScreen.querySelector('button').innerText = '다시 하기';
+        }
+
+        // 키보드 입력 감지
+        window.addEventListener('keydown', (e) => {
+            if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = true;
+                if (['ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); // 스크롤 방지
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (keys.hasOwnProperty(e.code)) {
+                keys[e.code] = false;
+            }
+        });
+    </script>
+</body>
+</html>

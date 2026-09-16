@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>피아노 타일 게임</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #222;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+        h1 { margin: 5px 0; font-size: 1.5rem; }
+        #score-board {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        #game-container {
+            position: relative;
+            width: 320px;
+            height: 500px;
+            background-color: #111;
+            border: 4px solid #444;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        /* 피아노 건반 가이드라인 (세로 4열) */
+        .column-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 80px;
+            border-right: 1px solid #333;
+        }
+        .column-line:nth-child(1) { left: 0; }
+        .column-line:nth-child(2) { left: 80px; }
+        .column-line:nth-child(3) { left: 160px; }
+        .column-line:nth-child(4) { left: 240px; border-right: none; }
+
+        /* 내려오는 노트 */
+        .tile {
+            position: absolute;
+            width: 78px;
+            height: 120px;
+            background-color: #222;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: rgba(255,255,255,0.2);
+            transition: background-color 0.1s;
+        }
+        .tile.active {
+            background-color: #000;
+        }
+        /* 판정선 효과 */
+        #hit-line {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 4px;
+            background-color: #ffcc00;
+            box-shadow: 0 0 10px #ffcc00;
+        }
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            background-color: #ffcc00;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: #222;
+        }
+        button:hover { background-color: #e6b800; }
+    </style>
+</head>
+<body>
+
+    <h1>Piano Tiles</h1>
+    <div id="score-board">점수: <span id="score">0</span></div>
+
+    <div id="game-container">
+        <!-- 배경 열 구분선 -->
+        <div class="column-line"></div>
+        <div class="column-line"></div>
+        <div class="column-line"></div>
+        <div class="column-line"></div>
+        
+        <div id="hit-line"></div>
+
+        <!-- 시작 화면 오버레이 -->
+        <div id="start-screen">
+            <h2 id="game-message">피아노 타일</h2>
+            <button onclick="startGame()">게임 시작</button>
+        </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('game-container');
+        const scoreEl = document.getElementById('score');
+        const startScreen = document.getElementById('start-screen');
+        const gameMessage = document.getElementById('game-message');
+
+        let score = 0;
+        let gameInterval = null;
+        let spawnTimer = null;
+        let tiles = [];
+        let gameSpeed = 3.5; // 노트 내려오는 속도
+        let isPlaying = false;
+
+        const keys = ['KeyD', 'KeyF', 'KeyJ', 'KeyK']; // 키보드 대응 (D, F, J, K)
+        const colWidth = 80;
+
+        function startGame() {
+            // 초기화
+            container.querySelectorAll('.tile').forEach(t => t.remove());
+            tiles = [];
+            score = 0;
+            gameSpeed = 4;
+            scoreEl.innerText = score;
+            startScreen.style.display = 'none';
+            isPlaying = true;
+
+            // 게임 루프 시작
+            gameInterval = requestAnimationFrame(updateGame);
+            
+            // 노트 생성 타이머 (시간이 갈수록 조금씩 빨라짐)
+            spawnTimer = setInterval(spawnTile, 600);
+        }
+
+        function spawnTile() {
+            if (!isPlaying) return;
+
+            let col = Math.floor(Math.random() * 4);
+            let tileEl = document.createElement('div');
+            tileEl.className = 'tile active';
+            tileEl.style.left = (col * colWidth + 1) + 'px';
+            tileEl.style.top = '-120px';
+            
+            let tileObj = {
+                element: tileEl,
+                col: col,
+                y: -120,
+                clicked: false
+            };
+
+            container.appendChild(tileEl);
+            tiles.push(tileObj);
+
+            // 마우스 클릭 이벤트
+            tileEl.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                hitTile(tileObj);
+            });
+            // 모바일 터치 이벤트
+            tileEl.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                hitTile(tileObj);
+            });
+        }
+
+        function hitTile(tileObj) {
+            if (!isPlaying || tileObj.clicked) return;
+            
+            // 판정선 근처(하단 350px ~ 500px 사이)에 있을 때만 정상 타격 인정
+            if (tileObj.y >= 320 && tileObj.y <= 520) {
+                tileObj.clicked = true;
+                tileObj.element.style.backgroundColor = '#4dff4d'; // 누르면 초록색 깜빡임
+                setTimeout(() => tileObj.element.remove(), 50);
+                
+                score += 10;
+                scoreEl.innerText = score;
+
+                // 점수가 오를수록 속도 증가
+                if (score % 100 === 0 && gameSpeed < 9) {
+                    gameSpeed += 0.5;
+                }
+            }
+        }
+
+        function updateGame() {
+            if (!isPlaying) return;
+
+            for (let i = tiles.length - 1; i >= 0; i--) {
+                let t = tiles[i];
+                t.y += gameSpeed;
+                t.element.style.top = t.y + 'px';
+
+                // 노트를 누르지 못하고 바닥(500px)을 지나친 경우 게임 오버
+                if (t.y > 500 && !t.clicked) {
+                    gameOver();
+                    return;
+                }
+
+                // 화면 아래로 완전히 사라진 타일 배열에서 제거
+                if (t.y > 500) {
+                    t.element.remove();
+                    tiles.splice(i, 1);
+                }
+            }
+
+            gameInterval = requestAnimationFrame(updateGame);
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            cancelAnimationFrame(gameInterval);
+            clearInterval(spawnTimer);
+
+            gameMessage.innerText = `게임 오버! 최종 점수: ${score}`;
+            startScreen.style.display = 'flex';
+            startScreen.querySelector('button').innerText = '다시 하기';
+        }
+
+        // 키보드 입력 지원 (D, F, J, K)
+        window.addEventListener('keydown', (e) => {
+            if (!isPlaying) return;
+            let index = keys.indexOf(e.code);
+            if (index !== -1) {
+                // 해당 열에서 가장 아래에 있는 활성 노트 찾기
+                let targetTile = tiles.find(t => t.col === index && !t.clicked && t.y >= 250);
+                if (targetTile) {
+                    hitTile(targetTile);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

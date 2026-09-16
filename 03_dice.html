@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 게임</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #faf8ef;
+            color: #776e65;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        h1 {
+            font-size: 3rem;
+            margin: 0 0 10px 0;
+        }
+        #score-container {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            background: #bbada0;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(4, 100px);
+            grid-template-rows: repeat(4, 100px);
+            gap: 12px;
+            background-color: #bbada0;
+            padding: 12px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            background-color: rgba(238, 228, 218, 0.35);
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            font-weight: bold;
+            user-select: none;
+            transition: all 0.1s ease-in-out;
+        }
+        /* 숫자에 따른 배경색 스타일링 */
+        .n-2    { background: #eee4da; color: #776e65; }
+        .n-4    { background: #ede0c8; color: #776e65; }
+        .n-8    { background: #f2b179; color: #f9f6f2; }
+        .n-16   { background: #f59563; color: #f9f6f2; }
+        .n-32   { background: #f67c5f; color: #f9f6f2; }
+        .n-64   { background: #f65e3b; color: #f9f6f2; }
+        .n-128  { background: #edcf72; color: #f9f6f2; font-size: 1.8rem; }
+        .n-256  { background: #edcc61; color: #f9f6f2; font-size: 1.8rem; }
+        .n-512  { background: #edc850; color: #f9f6f2; font-size: 1.8rem; }
+        .n-1024 { background: #edc53f; color: #f9f6f2; font-size: 1.5rem; }
+        .n-2048 { background: #edc22e; color: #f9f6f2; font-size: 1.5rem; }
+        .n-super{ background: #3c3a32; color: #f9f6f2; font-size: 1.2rem; }
+        
+        #message {
+            margin-top: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 30px;
+        }
+        button {
+            margin-top: 10px;
+            padding: 8px 16px;
+            font-size: 1rem;
+            font-weight: bold;
+            background-color: #8f7a66;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #9f8b76; }
+    </style>
+</head>
+<body>
+
+    <h1>2048</h1>
+    <div id="score-container">점수: <span id="score">0</span></div>
+    
+    <div id="grid"></div>
+    <div id="message"></div>
+    <button onclick="initGame()">다시 시작</button>
+
+    <script>
+        const gridEl = document.getElementById('grid');
+        const scoreEl = document.getElementById('score');
+        const messageEl = document.getElementById('message');
+
+        let board = [];
+        let score = 0;
+        let gameOver = false;
+
+        function initGame() {
+            board = Array.from({ length: 4 }, () => Array(4).fill(0));
+            score = 0;
+            gameOver = false;
+            messageEl.innerText = '';
+            
+            addNewNumber();
+            addNewNumber();
+            render();
+        }
+
+        function addNewNumber() {
+            let emptyCells = [];
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    if (board[r][c] === 0) {
+                        emptyCells.push({ r, c });
+                    }
+                }
+            }
+            if (emptyCells.length > 0) {
+                let randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                // 90% 확률로 2, 10% 확률로 4 생성
+                board[randomCell.r][randomCell.c] = Math.random() < 0.9 ? 2 : 4;
+            }
+        }
+
+        function render() {
+            gridEl.innerHTML = '';
+            scoreEl.innerText = score;
+
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    const cell = document.createElement('div');
+                    const val = board[r][c];
+                    cell.className = 'cell';
+                    if (val > 0) {
+                        cell.innerText = val;
+                        cell.classList.add(val <= 2048 ? `n-${val}` : 'n-super');
+                    }
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        // 배열 한 줄을 왼쪽으로 밀고 합치는 핵심 로직
+        function slideRow(row) {
+            // 1. 0이 아닌 숫자들만 추출
+            let arr = row.filter(val => val !== 0);
+            let newRow = [];
+            let i = 0;
+            
+            while (i < arr.length) {
+                if (i + 1 < arr.length && arr[i] === arr[i + 1]) {
+                    let mergedVal = arr[i] * 2;
+                    newRow.push(mergedVal);
+                    score += mergedVal;
+                    i += 2; // 다음 칸은 합쳐졌으므로 건너뜀
+                } else {
+                    newRow.push(arr[i]);
+                    i++;
+                }
+            }
+            
+            // 2. 나머지를 0으로 채움 (길이 4 유지)
+            while (newRow.length < 4) {
+                newRow.push(0);
+            }
+            return newRow;
+        }
+
+        function rotateBoard(matrix) {
+            // 시계 방향 90도 회전
+            let res = Array.from({ length: 4 }, () => Array(4).fill(0));
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    res[c][3 - r] = matrix[r][c];
+                }
+            }
+            return res;
+        }
+
+        function move(direction) {
+            if (gameOver) return;
+
+            let prevBoard = JSON.stringify(board);
+
+            // 방향에 맞게 보드를 회전시켜서 항상 '왼쪽'으로 미는 로직으로 통일
+            // direction: 0(왼쪽), 1(위), 2(오른쪽), 3(아래)
+            let turns = 0;
+            if (direction === 'ArrowUp') turns = 3;
+            else if (direction === 'ArrowRight') turns = 2;
+            else if (direction === 'ArrowDown') turns = 1;
+
+            for (let t = 0; t < turns; t++) board = rotateBoard(board);
+
+            // 각 행을 슬라이드
+            for (let r = 0; r < 4; r++) {
+                board[r] = slideRow(board[r]);
+            }
+
+            // 원위치로 다시 회전
+            for (let t = 0; t < (4 - turns) % 4; t++) board = rotateBoard(board);
+
+            // 보드판에 변화가 생겼을 때만 새로운 숫자 생성
+            if (prevBoard !== JSON.stringify(board)) {
+                addNewNumber();
+                render();
+                checkGameOver();
+            }
+        }
+
+        function checkGameOver() {
+            // 1. 빈 칸이 있으면 게임 오버 아님
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    if (board[r][c] === 0) return;
+                }
+            }
+
+            // 2. 가로/세로 인접한 숫자가 같으면 게임 오버 아님
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    let current = board[r][c];
+                    if (c < 3 && current === board[r][c + 1]) return;
+                    if (r < 3 && current === board[r + 1][c]) return;
+                }
+            }
+
+            // 더 이상 움직일 수 없음
+            gameOver = true;
+            messageEl.innerText = '게임 오버! 더 이상 움직일 수 없습니다.';
+        }
+
+        // 키보드 이벤트 리스너 등록
+        window.addEventListener('keydown', e => {
+            if (['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown', 'KeyA', 'KeyW', 'KeyD', 'KeyS'].includes(e.code)) {
+                e.preventDefault(); // 스크롤 방지
+                let dir = e.code;
+                if (dir === 'KeyA') dir = 'ArrowLeft';
+                if (dir === 'KeyW') dir = 'ArrowUp';
+                if (dir === 'KeyD') dir = 'ArrowRight';
+                if (dir === 'KeyS') dir = 'ArrowDown';
+
+                move(dir);
+            }
+        });
+
+        // 게임 최초 시작
+        initGame();
+    </script>
+</body>
+</html>
